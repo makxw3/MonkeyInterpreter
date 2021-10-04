@@ -5,8 +5,8 @@ import "monkey/token"
 // The lexer struct
 type Lexer struct {
 	input string // The input that is being scanned
-	index int    // The index of the current character to be read
-	char  byte   // The current character that is being read
+	index int    // The index of the next character to be read
+	char  byte   // The current character that is being read == input[index - 1]
 }
 
 // Helper function to create a new Lexer
@@ -18,7 +18,7 @@ func New(input string) *Lexer {
 
 // Helper function that returns the next char only
 func (lx *Lexer) peekChar() byte {
-	if lx.index >= len(lx.input) {
+	if lx.index == len(lx.input) {
 		return 0
 	} else {
 		return lx.input[lx.index]
@@ -27,17 +27,23 @@ func (lx *Lexer) peekChar() byte {
 
 // Helper function to read the next character and advance the pointers
 func (lx *Lexer) readNextChar() {
+	// If the index to be read is beyond the input then assign lx.char = '\0'
 	if lx.index >= len(lx.input) {
 		lx.char = 0
 	} else {
 		lx.char = lx.input[lx.index]
-		lx.index++
 	}
+	lx.index++
 }
 
-// Return lx.index - 1 -- The index of the current char lx.char
-func (lx *Lexer) cIndex() int {
-	return lx.index - 1
+var KEYWORDS = map[string]token.TokenType{
+	"fn":     token.FUNCTION,
+	"false":  token.FALSE,
+	"true":   token.TRUE,
+	"else":   token.ELSE,
+	"if":     token.IF,
+	"return": token.RETURN,
+	"let":    token.LET,
 }
 
 // GetNextToken returns the next token
@@ -86,8 +92,13 @@ func (lx *Lexer) GetNextToken() token.Token {
 	case '<':
 		tok = lx.makeToken(token.LT)
 	default:
-		if lx.isString() {
-			return token.Token{Literal: lx.readIdentifier(), Type: token.IDENTIFIER}
+		if lx.isLetter() {
+			lit := lx.readIdentifier()
+			_type, ok := KEYWORDS[lit]
+			if ok {
+				return token.Token{Literal: lit, Type: _type}
+			}
+			return token.Token{Literal: lit, Type: token.IDENTIFIER}
 		} else if lx.isDigit() {
 			return token.Token{Literal: lx.readNumber(), Type: token.INT}
 		}
@@ -103,17 +114,17 @@ func (lx *Lexer) makeToken(tType token.TokenType) token.Token {
 }
 
 // Helper function to check if lx.char is a string
-func (lx *Lexer) isString() bool {
+func (lx *Lexer) isLetter() bool {
 	return lx.char >= 'a' && lx.char <= 'z' || lx.char >= 'A' && lx.char <= 'Z'
 }
 
 // Helper function to read Identifiers
 func (lx *Lexer) readIdentifier() string {
-	var mark int = lx.cIndex()
-	for lx.isString() {
+	var mark int = lx.index - 1
+	for lx.isLetter() {
 		lx.readNextChar()
 	}
-	return lx.input[mark:lx.index]
+	return lx.input[mark : lx.index-1]
 }
 
 // Helper function to check if a charater is a digit
@@ -123,11 +134,11 @@ func (lx *Lexer) isDigit() bool {
 
 // Helper function to read Numbers
 func (lx *Lexer) readNumber() string {
-	var mark int = lx.cIndex()
+	var mark int = lx.index - 1
 	for lx.isDigit() {
 		lx.readNextChar()
 	}
-	return lx.input[mark:lx.index]
+	return lx.input[mark : lx.index-1]
 }
 
 // Function to skip white spaces
